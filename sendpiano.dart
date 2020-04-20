@@ -1,6 +1,15 @@
+//   flutter_midi:
+//   flutter_socket_io:
+
+// MIDI SEND
+
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_midi/flutter_midi.dart';
+import 'package:flutter_socket_io/flutter_socket_io.dart';
+import 'package:flutter_socket_io/socket_io_manager.dart';
 import 'package:tonic/tonic.dart';
 
 void main() => runApp(MyApp());
@@ -11,13 +20,27 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  SocketIO socketIO;
+  List messages;
+
   @override
   initState() {
-    FlutterMidi.unmute();
-    rootBundle.load("assets/sounds/Piano.sf2").then((sf2) {
-      FlutterMidi.prepare(sf2: sf2, name: "Piano.sf2");
-    });
+    messages = List();
 
+    socketIO = SocketIOManager().createSocketIO(
+      'http://:3000',
+      '/',
+    )
+      ..init()
+      ..subscribe('receive_message', (jsonData) async{
+        await Future.microtask(() async{
+          return await json.decode(jsonData);
+        }).then((data){
+          this.setState(() => messages.add(data));
+          return;
+        });
+      })
+      ..connect();
     super.initState();
   }
 
@@ -30,6 +53,7 @@ class _MyAppState extends State<MyApp> {
       title: 'The Pocket Piano',
       theme: ThemeData.dark(),
       home: Scaffold(
+        appBar: AppBar(title: Text("SEND"),),
           body: ListView.builder(
             itemCount: 7,
             controller: ScrollController(initialScrollOffset: 1500.0),
@@ -85,19 +109,28 @@ class _MyAppState extends State<MyApp> {
                 child: InkWell(
                   borderRadius: borderRadius,
                   highlightColor: Colors.grey,
-                  onTap: () {},
-                  onTapDown: (_) => FlutterMidi.playMidiNote(midi: midi),
-                  // 네트워크 적용할 부분?
+                  onTap: ()async{
+                    await Future.microtask((){
+                      socketIO.sendMessage(
+                          'send_message', json.encode(
+                          {
+                            "message": midi,
+                            "name" :"James"
+                          }
+                      ));
+                      return;
+                    });
+                  },
                 ))),
         Positioned(
             left: 0.0,
             right: 0.0,
             bottom: 20.0,
             child: Text(pitchName,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-              color: !accidental ? Colors.black : Colors.white
-              )
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: !accidental ? Colors.black : Colors.white
+                )
             )
         ),
       ],
@@ -111,7 +144,9 @@ class _MyAppState extends State<MyApp> {
               elevation: 6.0,
               borderRadius: borderRadius,
               shadowColor: Color(0x802196F3),
-              child: pianoKey));
+              child: pianoKey
+          )
+      );
     }
     return Container(
         width: keyWidth,
