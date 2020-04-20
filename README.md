@@ -1,4 +1,4 @@
-# Netmidi
+# NetMidi
 
 SEND FlutterAPP <-> Socket Server <-> PLAY FlutterAPP
 
